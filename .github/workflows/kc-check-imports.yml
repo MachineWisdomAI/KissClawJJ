@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo (full history)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Checkout kissclaw-tools
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: MachineWisdomAI/kissclaw-tools
           path: .kissclaw-tools
