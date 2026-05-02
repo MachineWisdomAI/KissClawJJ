@@ -10,23 +10,39 @@ on:
         required: true
         type: string
 
+# `contents: write` is required for `gh release upload`. The default-branch
+# defense-in-depth check below prevents this write capability from being abused
+# to publish builds from `main` (the upstream mirror).
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve build ref
+        id: ref
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "release" ]; then
+            ref="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ inputs.ref }}" ]; then
+            ref="${{ inputs.ref }}"
+          else
+            ref="${{ github.ref }}"
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - name: Checkout release ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
 
       - name: Verify checkout integrity
         run: |
           set -euo pipefail
-          intended_ref="${{ inputs.ref || github.ref }}"
-          # Annotated tags need dereferencing to get the commit SHA.
+          intended_ref="${{ steps.ref.outputs.ref }}"
           intended_sha=$(git rev-list -n 1 "$intended_ref")
           actual_sha=$(git rev-parse HEAD)
           if [ "$intended_sha" != "$actual_sha" ]; then
@@ -58,37 +74,59 @@ jobs:
         run: pnpm build
 
       - name: Package tarball
+        id: pack
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
           name=$(node -p "require('./package.json').name")
           pnpm pack
-          mv *.tgz "kissclawjj-${version}.tgz"
-          tarball="kissclawjj-${version}.tgz"
-          sha256sum "$tarball" > "${tarball}.sha256"
-          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          src="${name}-${version}.tgz"
+          dst="kissclawjj-${version}.tgz"
+          if [ ! -f "$src" ]; then
+            src=$(ls *.tgz | head -n 1)
+          fi
+          if [ "$src" != "$dst" ]; then
+            mv "$src" "$dst"
+          fi
+          sha256sum "$dst" > "${dst}.sha256"
+          {
+            echo "tarball=$dst"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate release metadata
         run: |
           set -euo pipefail
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          sha=$(git rev-parse HEAD)
           cat > "kissclawjj-release-metadata.json" <<METADATA
           {
             "name": "kissclawjj",
-            "version": "$VERSION",
-            "ref": "${{ inputs.ref || github.ref }}",
-            "sha": "$(git rev-parse HEAD)",
-            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            "version": "${{ steps.pack.outputs.version }}",
+            "ref": "${{ steps.ref.outputs.ref }}",
+            "sha": "$sha",
+            "built_at": "$built_at"
           }
           METADATA
 
       - name: Upload release assets
         if: github.event_name == 'release'
         run: |
+          set -euo pipefail
           gh release upload "${{ github.event.release.tag_name }}" \
-            "$TARBALL" \
-            "${TARBALL}.sha256" \
+            "${{ steps.pack.outputs.tarball }}" \
+            "${{ steps.pack.outputs.tarball }}.sha256" \
             "kissclawjj-release-metadata.json" \
             --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload workflow artifacts (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kissclawjj-release-${{ steps.pack.outputs.version }}
+          path: |
+            ${{ steps.pack.outputs.tarball }}
+            ${{ steps.pack.outputs.tarball }}.sha256
+            kissclawjj-release-metadata.json
