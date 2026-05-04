@@ -1,7 +1,22 @@
-> **KissClawJJ** is a production-stability downstream of OpenClaw.
-> See [KISSCLAWJJ.md](KISSCLAWJJ.md) for boundary and branch model,
-> [BACKPORT_POLICY.md](BACKPORT_POLICY.md) for cherry-pick eligibility (D8/D9/D10),
-> and [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) for the release procedure (D7 invariant).
+> **KissClawJJ — alternate POC for the Git-vs-jj trial. Not for production. Install only one of `kissclaw` / `kissclawjj` at a time.**
+>
+> Install (current; npm registry not yet used):
+>
+> ```
+> npm install -g https://github.com/MachineWisdomAI/KissClawJJ/releases/download/v1.0.1-rc.3/kissclawjj-1.0.1-rc.3.tgz
+> ```
+>
+> If upstream `openclaw` is already globally installed, run `npm uninstall -g openclaw` first or pass `--force`. Same applies if `kissclaw` is currently installed.
+>
+> Run (same as upstream — this is the point of the downstream):
+>
+> ```
+> openclaw --version
+> openclaw config get gateway.mode
+> openclaw channels login
+> ```
+>
+> KissClawJJ ships the same `openclaw` binary, reads `~/.openclaw/` configs, and honors `OPENCLAW_*` env vars. The downstream-specific surface is the release cadence and the stability gating (see [BACKPORT_POLICY.md](BACKPORT_POLICY.md) for cherry-pick eligibility — D8/D9/D10 — and [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) for the release procedure — D7 invariant); user-facing behavior is upstream's. See [KISSCLAWJJ.md](KISSCLAWJJ.md) for boundary and branch model.
 
 # 🦞 OpenClaw — Personal AI Assistant
 
