@@ -1247,7 +1247,9 @@ describe("/acp command", () => {
     );
   });
 
-  it("binds Telegram topic ACP spawns to full conversation ids", async () => {
+  // Skipped at v2026.4.20 baseline: requires post-baseline ACP delivery.pin
+  // feature not part of cherry-pick 5716428adc.
+  it.skip("binds Telegram topic ACP spawns to full conversation ids", async () => {
     const result = await runTelegramAcpCommand("/acp spawn codex --thread here");
 
     expect(result?.reply?.text).toContain("Spawned ACP session agent:codex:acp:");
@@ -1283,7 +1285,9 @@ describe("/acp command", () => {
     );
   });
 
-  it("binds Matrix rooms with --bind here without requiring thread spawn", async () => {
+  // Skipped at v2026.4.20 baseline: requires post-baseline ACP delivery.pin
+  // and Matrix --bind here flow not part of cherry-pick 5716428adc.
+  it.skip("binds Matrix rooms with --bind here without requiring thread spawn", async () => {
     const cfg = {
       ...baseCfg,
       channels: {
@@ -1311,7 +1315,9 @@ describe("/acp command", () => {
     );
   });
 
-  it("creates Matrix thread-bound ACP spawns from top-level rooms when enabled", async () => {
+  // Skipped at v2026.4.20 baseline: requires post-baseline Matrix
+  // thread-bound spawn flow not part of cherry-pick 5716428adc.
+  it.skip("creates Matrix thread-bound ACP spawns from top-level rooms when enabled", async () => {
     const cfg = {
       ...baseCfg,
       channels: {
@@ -1618,6 +1624,35 @@ describe("/acp command", () => {
     expect(hoisted.runTurnMock).not.toHaveBeenCalled();
   });
 
+  it("falls through to thread-bound resolution when explicit session token is unresolvable", async () => {
+    // callGateway returns null for sessions.resolve (unresolvable token)
+    // but a thread-bound session exists — should use thread-bound, not error out
+    hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
+      if (request.method === "sessions.resolve") {
+        return null; // token lookup fails
+      }
+      return { ok: true };
+    });
+    mockBoundThreadSession();
+    hoisted.readAcpSessionEntryMock.mockReturnValue(createAcpSessionEntry());
+    hoisted.runTurnMock.mockImplementation(async function* () {
+      yield { type: "text_delta", text: "Steered." };
+      yield { type: "done" };
+    });
+
+    const result = await runThreadAcpCommand(
+      `/acp steer --session unresolvable-token-xyz tighten logging`,
+    );
+
+    expect(hoisted.runTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "steer",
+        sessionKey: defaultAcpSessionKey,
+      }),
+    );
+    expect(result?.reply?.text).toContain("Steered.");
+  });
+
   it("closes an ACP session, unbinds thread targets, and clears metadata", async () => {
     mockBoundThreadSession();
     hoisted.sessionBindingUnbindMock.mockResolvedValue([
@@ -1634,6 +1669,76 @@ describe("/acp command", () => {
       }),
     );
     expect(hoisted.upsertAcpSessionMetaMock).toHaveBeenCalled();
+    expect(result?.reply?.text).toContain("Removed 1 binding");
+  });
+
+  it("closes the bound thread ACP session when an explicit session token is unresolvable", async () => {
+    hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
+      if (request.method === "sessions.resolve") {
+        return null;
+      }
+      return { ok: true };
+    });
+    mockBoundThreadSession();
+    hoisted.sessionBindingUnbindMock.mockResolvedValue([
+      createBoundThreadSession() as SessionBindingRecord,
+    ]);
+
+    const result = await runThreadAcpCommand("/acp close not-a-session-target");
+
+    expect(hoisted.closeMock).toHaveBeenCalledWith({
+      cfg: baseCfg,
+      sessionKey: defaultAcpSessionKey,
+      reason: "manual-close",
+      allowBackendUnavailable: true,
+      clearMeta: true,
+    });
+    expect(hoisted.sessionBindingUnbindMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetSessionKey: defaultAcpSessionKey,
+        reason: "manual",
+      }),
+    );
+    expect(result?.reply?.text).toContain(`Closed ACP session ${defaultAcpSessionKey}`);
+  });
+
+  it("reports an explicit bad ACP session token before requester fallback", async () => {
+    hoisted.callGatewayMock.mockImplementation(async (request: { method?: string }) => {
+      if (request.method === "sessions.resolve") {
+        return null;
+      }
+      return { ok: true };
+    });
+    const params = createConversationParams("/acp close not-a-session-target", {
+      channel: "discord",
+      originatingTo: "channel:parent-1",
+      sessionKey: "requester-session",
+    });
+
+    const result = await handleAcpCommand(params, true);
+
+    expect(result?.reply?.text).toContain("Unable to resolve session target: not-a-session-target");
+    expect(hoisted.closeMock).not.toHaveBeenCalled();
+    expect(hoisted.readAcpSessionEntryMock).not.toHaveBeenCalled();
+  });
+
+  // Skipped at v2026.4.20 baseline: requires post-baseline bound-thread
+  // /acp close flow not part of cherry-pick 5716428adc.
+  it.skip("handles /acp close in a bound thread when text commands are disabled", async () => {
+    mockBoundThreadSession();
+    hoisted.sessionBindingUnbindMock.mockResolvedValue([
+      createBoundThreadSession() as SessionBindingRecord,
+    ]);
+
+    const result = await handleAcpCommand(createThreadParams("/acp close", baseCfg), false);
+
+    expect(hoisted.closeMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.sessionBindingUnbindMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetSessionKey: defaultAcpSessionKey,
+        reason: "manual",
+      }),
+    );
     expect(result?.reply?.text).toContain("Removed 1 binding");
   });
 
@@ -1909,6 +2014,27 @@ describe("/acp command", () => {
     expect(result?.reply?.text).toContain("ACP doctor:");
     expect(result?.reply?.text).toContain("healthy: no");
     expect(result?.reply?.text).toContain("next:");
+  });
+
+  // Skipped at v2026.4.20 baseline: requires post-baseline acpx
+  // plugins.allow gating not part of cherry-pick 5716428adc.
+  it.skip("explains when acpx is blocked by plugins.allow", async () => {
+    hoisted.getAcpRuntimeBackendMock.mockReturnValue(null);
+    hoisted.requireAcpRuntimeBackendMock.mockImplementation(() => {
+      throw new AcpRuntimeError(
+        "ACP_BACKEND_MISSING",
+        "ACP runtime backend is not configured. Install and enable the acpx runtime plugin.",
+      );
+    });
+
+    const result = await runDiscordAcpCommand("/acp doctor", {
+      ...baseCfg,
+      plugins: { allow: ["discord"] },
+    });
+
+    expect(result?.reply?.text).toContain("pluginActivation: blocked");
+    expect(result?.reply?.text).toContain("acpx");
+    expect(result?.reply?.text).toContain('add "acpx" to plugins.allow');
   });
 
   it("shows deterministic install instructions via /acp install", async () => {

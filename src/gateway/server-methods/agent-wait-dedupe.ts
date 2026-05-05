@@ -2,6 +2,7 @@ import type { DedupeEntry } from "../server-shared.js";
 
 export type AgentWaitTerminalSnapshot = {
   status: "ok" | "error" | "timeout";
+  stopReason?: string;
   startedAt?: number;
   endedAt?: number;
   error?: string;
@@ -208,13 +209,18 @@ export function setGatewayDedupeEntry(params: {
   key: string;
   entry: DedupeEntry;
 }) {
+  const existing = params.dedupe.get(params.key);
+  const existingSnapshot = existing ? readTerminalSnapshotFromDedupeEntry(existing) : null;
+  const incomingSnapshot = readTerminalSnapshotFromDedupeEntry(params.entry);
+  if (existingSnapshot?.status === "timeout" && existingSnapshot.stopReason === "rpc") {
+    return;
+  }
   params.dedupe.set(params.key, params.entry);
   const runId = parseRunIdFromDedupeKey(params.key);
   if (!runId) {
     return;
   }
-  const snapshot = readTerminalSnapshotFromDedupeEntry(params.entry);
-  if (!snapshot) {
+  if (!incomingSnapshot) {
     return;
   }
   notifyWaiters(runId);

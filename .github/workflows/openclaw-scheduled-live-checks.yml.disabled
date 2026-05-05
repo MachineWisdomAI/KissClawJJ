@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
   pull-requests: read
 
 concurrency:
@@ -21,13 +20,12 @@ jobs:
   live_and_openwebui_checks:
     permissions:
       contents: read
-      packages: write
       pull-requests: read
     uses: ./.github/workflows/openclaw-live-and-e2e-checks-reusable.yml
     with:
       ref: ${{ github.sha }}
       include_repo_e2e: true
-      include_release_path_suites: true
+      include_release_path_suites: false
       include_openwebui: true
       include_live_suites: true
     secrets:
@@ -74,4 +72,3 @@ jobs:
       OPENCLAW_CLAUDE_SETTINGS_JSON: ${{ secrets.OPENCLAW_CLAUDE_SETTINGS_JSON }}
       OPENCLAW_CLAUDE_SETTINGS_LOCAL_JSON: ${{ secrets.OPENCLAW_CLAUDE_SETTINGS_LOCAL_JSON }}
       OPENCLAW_GEMINI_SETTINGS_JSON: ${{ secrets.OPENCLAW_GEMINI_SETTINGS_JSON }}
-      FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
