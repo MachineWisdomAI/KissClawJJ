@@ -103,6 +103,7 @@ export type DetachedTaskLifecycleRuntime = {
   startTaskRunByRunId: (params: DetachedTaskStartParams) => TaskRecord[];
   recordTaskRunProgressByRunId: (params: DetachedTaskProgressParams) => TaskRecord[];
   completeTaskRunByRunId: (params: DetachedTaskCompleteParams) => TaskRecord[];
+  finalizeTaskRunByRunId?: (params: DetachedTaskCompleteParams) => TaskRecord[];
   failTaskRunByRunId: (params: DetachedTaskFailParams) => TaskRecord[];
   setDetachedTaskDeliveryStatusByRunId: (params: DetachedTaskDeliveryStatusParams) => TaskRecord[];
   /**

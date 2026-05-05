@@ -56,7 +56,7 @@ type FinalEffectiveToolPolicyParams = {
   warn: (message: string) => void;
 };
 
-function resolveTrustedGroupId(params: FinalEffectiveToolPolicyParams): {
+export function resolveTrustedGroupId(params: Pick<FinalEffectiveToolPolicyParams, "groupId" | "sessionKey" | "spawnedBy">): {
   groupId: string | null | undefined;
   dropped: boolean;
 } {
